@@ -1,0 +1,70 @@
+[tool.poetry]
+name = "piicatcher"
+version = "0.21.2"
+description = "Find PII data in databases"
+authors = ["Tokern <info@tokern.io>"]
+license = "Apache 2.0"
+classifiers = [
+        "Development Status :: 4 - Beta",
+        "Intended Audience :: Developers",
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
+        "Topic :: Database",
+        "Topic :: Software Development",
+        "Topic :: Software Development :: Libraries :: Python Modules",
+]
+keywords=["pii","postgres","snowflake","redshift","athena","bigquery"]
+readme="README.md"
+homepage="https://tokern.io/"
+repository="https://github.com/tokern/piicatcher/"
+
+
+[tool.poetry.dependencies]
+python = ">=3.8,<=3.10.8"
+pyyaml = "*"
+click = "*"
+python-json-logger = "^2.0.2"
+commonregex-improved = "1.0.2"
+dbcat = "0.14.2"
+typer = "^0.4.0"
+goog-stats = "^0.1.2"
+tabulate = "^0.8.9"
+sqlalchemy-bigquery = "1.6.1"
+google-cloud-bigquery-storage = "2.20.0"
+dataclasses = {version = ">=0.6", markers="python_version >= '3.8' and python_version <= '3.10'"}
+great-expectations = {version = "^0.13.42", optional = true}
+acryl-datahub = {version = "^0.8.16", optional = true}
+tqdm = "^4.62.3"
+catalogue = "^2.0.6"
+
+[tool.poetry.extras]
+datahub = ["acryl-datahub", "great-expectations"]
+
+[tool.poetry.dev-dependencies]
+black = "==19.10b0"
+flake8 = "*"
+isort = "*"
+mypy = "*"
+pre-commit = "*"
+pytest = "*"
+coverage = "*"
+pytest-cov = "*"
+pytest-pylint = "*"
+twine = "*"
+pytest-mock = "*"
+types-PyMySQL = "^1.0.2"
+types-python-dateutil = "^0.1.6"
+types-PyYAML = "^5.4.6"
+pytest-cases = "^3.6.4"
+types-tabulate = "^0.8.3"
+pytest-order = "^1.0.0"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+piicatcher = "piicatcher.command_line:app"

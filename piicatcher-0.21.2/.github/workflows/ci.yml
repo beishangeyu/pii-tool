@@ -1,0 +1,67 @@
+# This workflow will install Python dependencies, run tests and lint with a single version of Python
+# For more information see: https://help.github.com/actions/language-and-framework-guides/using-python-with-github-actions
+
+name: piicatcher
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.8', '3.9', '3.10.8']
+    name: Python ${{ matrix.python-version }}
+    # Service containers to run with `container-job`
+    services:
+      # Label used to access the service container
+      postgres:
+        # Docker Hub image
+        image: postgres:13
+        ports:
+          - 5432:5432
+        # Provide the password for postgres
+        env:
+          POSTGRES_USER: piiuser
+          POSTGRES_PASSWORD: p11secret
+          POSTGRES_DB: piidb
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      mariadb:
+        image: mariadb:10.11.4
+        ports:
+          - 3306:3306
+        env:
+          MYSQL_USER: piiuser
+          MYSQL_PASSWORD: p11secret
+          MYSQL_DATABASE: piidb
+          MYSQL_ROOT_PASSWORD: r00tpassw0rd
+        options: --health-cmd="mysqladmin ping" --health-interval=5s --health-timeout=2s --health-retries=3
+    steps:
+    - uses: actions/checkout@v3
+    - uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Install Python Poetry
+      uses: abatilo/actions-poetry@v2
+      with:
+        poetry-version: 1.2.2
+    - name: View poetry version
+      run: poetry --version
+    - name: Install dependencies
+      run: |
+        python -m poetry install
+    - name: Test with pytest
+      run: |
+        python -m poetry run pytest --pg-host localhost --mysql-host localhost --junitxml=junit/test-results.xml --cov=piicatcher --cov-report=xml --cov-report=html tests/  
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
