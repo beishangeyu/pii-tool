@@ -36,9 +36,3 @@ nosetests.xml
 .pydevproject
 .idea/
 /.pypirc
-/stanford-ner-2020-11-17
-*.ipynb
-*.sh
-*.jar
-*.csv
-*.json*
