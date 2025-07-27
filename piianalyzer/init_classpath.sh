@@ -1,0 +1,1 @@
+export CLASSPATH='./stanford-ner.jar'
