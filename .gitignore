@@ -1,3 +1,5 @@
 *.code-workspace
 *.gz
 *.tar
+*.json
+*.log
