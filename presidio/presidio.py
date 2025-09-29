@@ -60,7 +60,7 @@ def result_path_for(dataset_name: str, filename: str, debug: bool) -> str:
 
 
 # 流式读取 gzip 文件
-def iter_json_gz_lines_c4(gz_file_path: str) -> Iterable[str]:
+def iter_dataset_c4(gz_file_path: str) -> Iterable[str]:
     with gzip.open(gz_file_path, "rt", encoding="utf-8") as f_in:
         for line in f_in:
             try:
@@ -113,7 +113,7 @@ def process_batches_for_file(
 
     # 计算起始偏移：跳过已完成的批次
     start_skip = resume_batch_cnt * batch_size
-    line_iter = iter_json_gz_lines_c4(gz_file_path)
+    line_iter = iter_dataset_c4(gz_file_path)
 
     # 跳过已完成行
     for _ in range(start_skip):
