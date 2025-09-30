@@ -2,7 +2,7 @@ from __future__ import annotations
 import json, os, argparse
 from typing import List, Dict, Tuple
 from multiprocessing import Pool, cpu_count, set_start_method
-from .utils import (
+from utils import (
     result_dir,
     result_path_for,
     ensure_dir,
