@@ -60,15 +60,25 @@ def result_path_for(dataset_name: str, filename: str, debug: bool) -> str:
 
 
 # 流式读取 gzip 文件
-def iter_dataset_c4(gz_file_path: str) -> Iterable[str]:
-    with gzip.open(gz_file_path, "rt", encoding="utf-8") as f_in:
-        for line in f_in:
-            try:
-                item = json.loads(line)
-                yield item["text"]
-            except Exception:
-                # 跳过坏行
-                continue
+def iter_dataset(gz_file_path: str, datasetname: str) -> Iterable[str]:
+    if datasetname == "c4":
+        with gzip.open(gz_file_path, "rt", encoding="utf-8") as f_in:
+            for line in f_in:
+                try:
+                    item = json.loads(line)
+                    yield item["text"]
+                except Exception:
+                    # 跳过坏行
+                    continue
+    elif datasetname=='googlenq':
+        with gzip.open(gz_file_path, "rt", encoding="utf-8") as f_in:
+            for line in f_in:
+                try:
+                    item = json.loads(line)
+                    yield item["question_text"]
+                except Exception:
+                    # 跳过坏行
+                    continue
 
 
 def batched(iterable: Iterable, n: int) -> Iterable[List]:
@@ -113,7 +123,7 @@ def process_batches_for_file(
 
     # 计算起始偏移：跳过已完成的批次
     start_skip = resume_batch_cnt * batch_size
-    line_iter = iter_dataset_c4(gz_file_path)
+    line_iter = iter_dataset(gz_file_path, dataset_name)
 
     # 跳过已完成行
     for _ in range(start_skip):
