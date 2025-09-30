@@ -59,16 +59,16 @@ def result_path_for(dataset_name: str, filename: str, debug: bool) -> str:
     return os.path.join(result_dir(dataset_name, debug), f"{filename}.json")
 
 
-# 流式读取 gzip 文件
+# TODO 添加新的数据集时这里需要修改
+# 流式读取数据集
 def iter_dataset(file_path: str, datasetname: str) -> Iterable[str]:
-    if datasetname == "c4":
+    if datasetname == "c4" or datasetname == "dolma":
         with gzip.open(file_path, "rt", encoding="utf-8") as f_in:
             for line in f_in:
                 try:
                     item = json.loads(line)
                     yield item["text"]
                 except Exception:
-                    # 跳过坏行
                     continue
     elif datasetname == "googlenq":
         with gzip.open(file_path, "rt", encoding="utf-8") as f_in:
@@ -77,7 +77,6 @@ def iter_dataset(file_path: str, datasetname: str) -> Iterable[str]:
                     item = json.loads(line)
                     yield item["question_text"]
                 except Exception:
-                    # 跳过坏行
                     continue
 
 
@@ -112,11 +111,12 @@ def process_batches_for_file(
     resume_batch_cnt: int,
     debug: bool,
 ) -> Dict:
-    """子进程执行体：顺序处理一个文件的所有 batch，并按批次落盘。"""
+    """子进程执行体：顺序处理一个文件的所有 batch, 并按批次落盘。"""
     # 延迟导入，避免主进程初始化 & 提高稳定性
     from presidio_analyzer import AnalyzerEngine  # type: ignore
 
-    if dataset_name == "c4":
+    # TODO 添加新的数据集时这里需要修改
+    if dataset_name == "c4" or dataset_name == "dolma":
         file_path = os.path.join(data_path, filename + ".json.gz")
     elif dataset_name == "googlenq":
         file_path = os.path.join(data_path, filename + ".jsonl.gz")
@@ -209,10 +209,11 @@ def build_resume_list(
             filename = file[: -len(".json")]
             filename2batchcnt[filename] = 0
 
+    # TODO 添加新的数据集这里需要修改
     # 遍历数据目录, 这里的格式不同数据集可能不同
     resume_list: List[Tuple[str, int]] = []
     for file in os.listdir(data_path):
-        if "c4" in dataset_name:
+        if "c4" in dataset_name or "dolma" in dataset_name:
             filename = file[: -len(".json.gz")]
             resume_batch_cnt = filename2batchcnt.get(filename, 0)
             if resume_batch_cnt != -1:
