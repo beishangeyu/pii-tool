@@ -60,9 +60,9 @@ def result_path_for(dataset_name: str, filename: str, debug: bool) -> str:
 
 
 # 流式读取 gzip 文件
-def iter_dataset(gz_file_path: str, datasetname: str) -> Iterable[str]:
+def iter_dataset(file_path: str, datasetname: str) -> Iterable[str]:
     if datasetname == "c4":
-        with gzip.open(gz_file_path, "rt", encoding="utf-8") as f_in:
+        with gzip.open(file_path, "rt", encoding="utf-8") as f_in:
             for line in f_in:
                 try:
                     item = json.loads(line)
@@ -70,8 +70,8 @@ def iter_dataset(gz_file_path: str, datasetname: str) -> Iterable[str]:
                 except Exception:
                     # 跳过坏行
                     continue
-    elif datasetname=='googlenq':
-        with gzip.open(gz_file_path, "rt", encoding="utf-8") as f_in:
+    elif datasetname == "googlenq":
+        with gzip.open(file_path, "rt", encoding="utf-8") as f_in:
             for line in f_in:
                 try:
                     item = json.loads(line)
@@ -116,14 +116,18 @@ def process_batches_for_file(
     # 延迟导入，避免主进程初始化 & 提高稳定性
     from presidio_analyzer import AnalyzerEngine  # type: ignore
 
-    gz_file_path = os.path.join(data_path, filename + ".json.gz")
+    if dataset_name == "c4":
+        file_path = os.path.join(data_path, filename + ".json.gz")
+    elif dataset_name == "googlenq":
+        file_path = os.path.join(data_path, filename + ".jsonl.gz")
+
     rpath = result_path_for(dataset_name, filename, debug)
 
     analyzer = AnalyzerEngine()
 
     # 计算起始偏移：跳过已完成的批次
     start_skip = resume_batch_cnt * batch_size
-    line_iter = iter_dataset(gz_file_path, dataset_name)
+    line_iter = iter_dataset(file_path, dataset_name)
 
     # 跳过已完成行
     for _ in range(start_skip):
@@ -189,6 +193,7 @@ def build_resume_list(
     ensure_dir(rdir)
 
     filename2batchcnt: Dict[str, int] = {}
+    # 读取结果目录, 这里的结果都是json格式
     for file in os.listdir(rdir):
         if not file.endswith(".json"):
             continue
@@ -198,20 +203,22 @@ def build_resume_list(
                 result_data = json.load(rf)
             is_completed = result_data.get("completed", False)
             batch_cnt = int(result_data.get("batch_cnt", 0))
-            if "c4" in dataset_name:
-                filename = file[: -len(".json")]
-                filename2batchcnt[filename] = -1 if is_completed else batch_cnt
+            filename = file[: -len(".json")]
+            filename2batchcnt[filename] = -1 if is_completed else batch_cnt
         except Exception:
-            # 结果文件损坏则从 0 重新开始
             filename = file[: -len(".json")]
             filename2batchcnt[filename] = 0
 
+    # 遍历数据目录, 这里的格式不同数据集可能不同
     resume_list: List[Tuple[str, int]] = []
     for file in os.listdir(data_path):
-        if not file.endswith(".json.gz"):
-            continue
         if "c4" in dataset_name:
             filename = file[: -len(".json.gz")]
+            resume_batch_cnt = filename2batchcnt.get(filename, 0)
+            if resume_batch_cnt != -1:
+                resume_list.append((filename, resume_batch_cnt))
+        elif "googlenq" in dataset_name:
+            filename = file[: -len(".jsonl.gz")]
             resume_batch_cnt = filename2batchcnt.get(filename, 0)
             if resume_batch_cnt != -1:
                 resume_list.append((filename, resume_batch_cnt))
