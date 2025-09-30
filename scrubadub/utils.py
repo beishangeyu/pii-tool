@@ -54,3 +54,41 @@ def iter_dataset_c4(gz_file_path: str) -> Iterable[str]:
             except Exception:
                 # 跳过坏行
                 continue
+
+
+def build_resume_list(
+    dataset_name: str, data_path: str, debug: bool
+) -> List[Tuple[str, int]]:
+    """读取结果目录，生成 (filename, resume_batch_cnt) 列表"""
+    rdir = result_dir(dataset_name, debug)
+    ensure_dir(rdir)
+
+    filename2batchcnt: Dict[str, int] = {}
+    for file in os.listdir(rdir):
+        if not file.endswith(".json"):
+            continue
+        fpath = os.path.join(rdir, file)
+        try:
+            with open(fpath, "r", encoding="utf-8") as rf:
+                result_data = json.load(rf)
+            is_completed = result_data.get("completed", False)
+            batch_cnt = int(result_data.get("batch_cnt", 0))
+            if "c4" in dataset_name:
+                filename = file[: -len(".json")]
+                filename2batchcnt[filename] = -1 if is_completed else batch_cnt
+        except Exception:
+            # 结果文件损坏则从 0 重新开始
+            filename = file[: -len(".json")]
+            filename2batchcnt[filename] = 0
+
+    resume_list: List[Tuple[str, int]] = []
+    for file in os.listdir(data_path):
+        if not file.endswith(".json.gz"):
+            continue
+        if "c4" in dataset_name:
+            filename = file[: -len(".json.gz")]
+            resume_batch_cnt = filename2batchcnt.get(filename, 0)
+            if resume_batch_cnt != -1:
+                resume_list.append((filename, resume_batch_cnt))
+
+    return resume_list
