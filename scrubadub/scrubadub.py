@@ -1,21 +1,15 @@
-import json, argparse
-import scrubadub
-from typing import List, Dict, Iterable, Tuple
+from __future__ import annotations
+import json, os, argparse
+from typing import List, Dict, Tuple
 from multiprocessing import Pool, cpu_count, set_start_method
-import argparse
-from .utils import build_resume_list
-
-
-def save_metrics_to_csv(all_batch_metrics, filename):
-    pass
-
-
-def transfer_labels(data):
-    pass
-
-
-def calculate_metrics(results, labels):
-    pass
+from .utils import (
+    result_dir,
+    result_path_for,
+    ensure_dir,
+    update_result,
+    iter_dataset,
+    batched,
+)
 
 
 # 顶层函数：子进程的入口（可被pickle）
@@ -39,122 +33,118 @@ def process_batches_for_file(
     resume_batch_cnt: int,
     debug: bool,
 ) -> Dict:
-    """直接从 JSONL 文件分批处理"""
-    all_results = []
-    batch_count = 0
-    current_batch = []
-    total_lines = 0
-    all_metrics = []
-    total_tp = total_fp = total_fn = 0
+    """子进程执行体：顺序处理一个文件的所有 batch, 并按批次落盘。"""
+    # 延迟导入，避免主进程初始化 & 提高稳定性
+    import scrubadub
 
-    with open(input_path, "r", encoding="utf-8") as f:
-        for line_num, line in enumerate(f, 1):
-            if line.strip():
-                try:
-                    data = json.loads(line)
-                    current_batch.append(data)
-                    total_lines += 1
+    # TODO 添加新的数据集时这里需要修改
+    if dataset_name == "c4" or dataset_name == "dolma":
+        file_path = os.path.join(data_path, filename + ".json.gz")
+    elif dataset_name == "googlenq":
+        file_path = os.path.join(data_path, filename + ".jsonl.gz")
 
-                    # 当批次达到指定大小时处理
-                    if len(current_batch) >= batch_size:
-                        batch_count += 1
-                        print(f"处理批次 {batch_count}，行数: {total_lines}")
+    rpath = result_path_for(dataset_name, filename, debug)
 
-                        labels = transfer_labels(current_batch)
-                        result = process_batch(current_batch, batch_count)
-                        if result:
-                            all_results.append(result)
-                        metrics = calculate_metrics(result, labels)
-                        print(f"批次 {batch_count} 处理完成，指标: {metrics}")
-                        all_metrics.append(
-                            {
-                                "batch": batch_count,
-                                "precision": metrics["precision"],
-                                "recall": metrics["recall"],
-                                "f1": metrics["f1"],
-                                "true_positives": metrics["true_positives"],
-                                "false_positives": metrics["false_positives"],
-                                "false_negatives": metrics["false_negatives"],
-                            }
-                        )
-                        total_tp += metrics["true_positives"]
-                        total_fp += metrics["false_positives"]
-                        total_fn += metrics["false_negatives"]
-                        current_batch = []  # 清空当前批次
+    # 计算起始偏移：跳过已完成的批次
+    start_skip = resume_batch_cnt * batch_size
+    line_iter = iter_dataset(file_path, dataset_name)
 
-                except json.JSONDecodeError as e:
-                    print(f"第 {line_num} 行 JSON 解析错误: {e}")
-                    continue
+    # 跳过已完成行
+    for _ in range(start_skip):
+        try:
+            next(line_iter)
+        except StopIteration:
+            break
 
-    # 处理最后一批（如果有剩余数据）
-    if current_batch:
-        batch_count += 1
-        print(f"处理最后批次 {batch_count}，总行数: {total_lines}")
-        result = process_batch(current_batch, batch_count)
-        if result:
-            all_results.append(result)
-        metrics = calculate_metrics(result, labels)
-        print(f"批次 {batch_count} 处理完成，指标: {metrics}")
-        all_metrics.append(
-            {
-                "batch": batch_count,
-                "precision": metrics["precision"],
-                "recall": metrics["recall"],
-                "f1": metrics["f1"],
-                "true_positives": metrics["true_positives"],
-                "false_positives": metrics["false_positives"],
-                "false_negatives": metrics["false_negatives"],
-            }
+    total_processed_batches = 0
+    batch_index = resume_batch_cnt
+
+    for i, batch_items in enumerate(batched(line_iter, batch_size)):
+        batch_index = resume_batch_cnt + i + 1
+        entity2cnt: Dict[str, int] = {}
+        for item in batch_items:
+            text = item
+            if not text:
+                continue
+            try:
+                results = scrubadub.list_filth(text)
+                for result in results:
+                    if result.type != "unknown":
+                        entity2cnt[result.type] = entity2cnt.get(result.type, 0) + 1
+            except Exception:
+                continue
+        # 写出批次结果
+        update_result(
+            result_file_path=rpath,
+            batch_cnt=batch_index,
+            cur_batch_result=entity2cnt,
+            completed=False,
         )
-        total_tp += metrics["true_positives"]
-        total_fp += metrics["false_positives"]
-        total_fn += metrics["false_negatives"]
+        total_processed_batches += 1
+        if debug:
+            print(
+                f"[DEBUG] {filename}: processed batch {batch_index}, entities={entity2cnt}"
+            )
+            break  # debug 下只处理 1 个 batch
 
-    print(f"所有 {batch_count} 个批次处理完成，总计 {total_lines} 行")
-    final_precision = (
-        total_tp / (total_tp + total_fp) if (total_tp + total_fp) > 0 else 0
-    )
-    final_recall = total_tp / (total_tp + total_fn) if (total_tp + total_fn) > 0 else 0
-    final_f1 = (
-        2 * (final_precision * final_recall) / (final_precision + final_recall)
-        if (final_precision + final_recall) > 0
-        else 0
-    )
+    # 标记文件完成（若 debug 则不标完成）
+    if not debug:
+        # 标记完成
+        update_result(
+            rpath,
+            None,
+            None,
+            completed=True,
+        )
 
-    all_metrics.append(
-        {
-            "batch": "final",
-            "precision": final_precision,
-            "recall": final_recall,
-            "f1": final_f1,
-            "true_positives": total_tp,
-            "false_positives": total_fp,
-            "false_negatives": total_fn,
-        }
-    )
-
-    save_metrics_to_csv(all_metrics, "./ai4privacy_results/" + filename + ".csv")
-    return all_metrics
-
-
-def process_batch(batch_data, batch_num):
-    """处理一批数据"""
-    preds = {
-        "credential": [],
-        "credit_card": [],
-        "email": [],
-        "phone": [],
-        "twitter": [],
-        "url": [],
-        "social_security_number": [],
+    return {
+        "filename": filename,
+        "last_batch_cnt": batch_index,
+        "batches_processed": total_processed_batches,
+        "completed": (not debug),
     }
-    for data in batch_data:
-        # TAG
-        results = scrubadub.list_filth(data["source_text"])
-        for result in results:
-            if result.type != "unknown":
-                preds[result.type].append(data["source_text"][result.beg : result.end])
-    return preds
+
+
+def build_resume_list(
+    dataset_name: str, data_path: str, debug: bool
+) -> List[Tuple[str, int]]:
+    """读取结果目录，生成 (filename, resume_batch_cnt) 列表"""
+    rdir = result_dir(dataset_name, debug)
+    ensure_dir(rdir)
+
+    filename2batchcnt: Dict[str, int] = {}
+    # 读取结果目录, 这里的结果都是json格式
+    for file in os.listdir(rdir):
+        if not file.endswith(".json"):
+            continue
+        fpath = os.path.join(rdir, file)
+        try:
+            with open(fpath, "r", encoding="utf-8") as rf:
+                result_data = json.load(rf)
+            is_completed = result_data.get("completed", False)
+            batch_cnt = int(result_data.get("batch_cnt", 0))
+            filename = file[: -len(".json")]
+            filename2batchcnt[filename] = -1 if is_completed else batch_cnt
+        except Exception:
+            filename = file[: -len(".json")]
+            filename2batchcnt[filename] = 0
+
+    # TODO 添加新的数据集这里需要修改
+    # 遍历数据目录, 这里的格式不同数据集可能不同
+    resume_list: List[Tuple[str, int]] = []
+    for file in os.listdir(data_path):
+        if "c4" in dataset_name or "dolma" in dataset_name:
+            filename = file[: -len(".json.gz")]
+            resume_batch_cnt = filename2batchcnt.get(filename, 0)
+            if resume_batch_cnt != -1:
+                resume_list.append((filename, resume_batch_cnt))
+        elif "googlenq" in dataset_name:
+            filename = file[: -len(".jsonl.gz")]
+            resume_batch_cnt = filename2batchcnt.get(filename, 0)
+            if resume_batch_cnt != -1:
+                resume_list.append((filename, resume_batch_cnt))
+
+    return resume_list
 
 
 def main():
@@ -219,16 +209,4 @@ def main():
 
 
 if __name__ == "__main__":
-    data_names = [
-        "1english_openpii_8k",
-        "dutch_openpii_7k",
-        "french_openpii_8k",
-        "german_openpii_8k",
-        "italian_openpiii_8k",
-        "spanish_openpii_8k",
-    ]
-    for data_name in data_names:
-        input_jsonl_path = f"../ai4privacy/data/validation/{data_name}.jsonl"
-        batch_size = 1000  # 每批处理的行数
-        all_metrics = process_batches_for_file(input_jsonl_path, data_name, batch_size)
-    print("所有批次的指标:", all_metrics)
+    main()
