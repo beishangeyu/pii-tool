@@ -125,6 +125,7 @@ def strs2csv(str_list: List[str], filename: str, batchcnt:int) -> str:
     # 保存路径为 ./tmp_csv 目录下
     df = pd.DataFrame(str_list)
     df.to_csv(csv_file, index=False, header=False)
+    return csv_file
 
 
 def delete_file(file_path: str, debug: bool) -> None:
