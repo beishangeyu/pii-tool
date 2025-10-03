@@ -32,7 +32,12 @@ def update_result(
         result_data = {"batches": {}, "batch_cnt": 0, "completed": False}
     else:
         with open(result_file_path, "r", encoding="utf-8") as rf:
-            result_data = json.load(rf)
+            try:
+                result_data = json.load(rf)
+            # 有时候出错中断后, 会出现json为空的情况
+            except json.JSONDecodeError:
+                result_data = {"batches": {}, "batch_cnt": 0, "completed": False}
+
 
     if completed == True:
         result_data["completed"] = True
