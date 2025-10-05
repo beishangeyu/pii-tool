@@ -65,13 +65,16 @@ def result_path_for(dataset_name: str, filename: str, debug: bool) -> str:
 # 流式读取数据集
 def iter_dataset(file_path: str, datasetname: str) -> Iterable[str]:
     if datasetname == "c4" or datasetname == "dolma":
-        with gzip.open(file_path, "rt", encoding="utf-8") as f_in:
-            for line in f_in:
-                try:
-                    item = json.loads(line)
-                    yield item["text"]
-                except Exception:
-                    continue
+        try:
+            with gzip.open(file_path, "rt", encoding="utf-8") as f_in:
+                for line in f_in:
+                    try:
+                        item = json.loads(line)
+                        yield item["text"]
+                    except Exception:
+                        continue
+        except Exception as e:
+            print(f"Error reading file: {file_path} in iter_dataset function. Error: {e}")
     elif datasetname == "googlenq":
         with gzip.open(file_path, "rt", encoding="utf-8") as f_in:
             for line in f_in:
