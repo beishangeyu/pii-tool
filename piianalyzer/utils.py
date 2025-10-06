@@ -119,20 +119,14 @@ def build_resume_list(
     return resume_list
 
 # 返回csv文件路径
-def strs2csv(str_list: List[str], filename: str, batchcnt:int) -> str:
-    # 如果已经存在, 说明是旧的没删掉, 覆盖写入
+def strs2csv(str_list: List[str], filename: str, batchcnt: int) -> str:
     csv_file = os.path.join("./tmp_csv", f"{filename}_batch_{batchcnt}.csv")
-    # 保存路径为 ./tmp_csv 目录下
-    df = pd.DataFrame(str_list)
-    df.to_csv(csv_file, index=False, header=False)
+    clean_list = [(s if isinstance(s, str) else str(s)).replace('\x00', '') for s in str_list]
+    df = pd.DataFrame(clean_list)
+    df.to_csv(csv_file, index=False, header=False, escapechar='\\', encoding='utf-8')
     return csv_file
 
 
 def delete_file(file_path: str, debug: bool) -> None:
     if os.path.exists(file_path):
         os.remove(file_path)
-        if debug:
-            print(f"文件已删除: {file_path}")
-    else:
-        if debug:
-            print(f"文件不存在: {file_path}")

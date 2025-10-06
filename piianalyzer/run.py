@@ -12,7 +12,8 @@ from utils import (
     strs2csv,
     delete_file
 )
-
+import csv
+csv.field_size_limit(10**9)
 
 
 # 顶层函数：子进程的入口（可被pickle）
@@ -207,6 +208,7 @@ def main():
             if args.debug:
                 print("[DEBUG] summary:", summary)
 
+    delete_file("./tmp_csv", args.debug)
     print(f"Done. Files processed: {processed}/{total_files}.")
 
 
