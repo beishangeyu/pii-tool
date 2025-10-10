@@ -146,6 +146,7 @@ def main():
     parser.add_argument("--data_path", type=str, required=True)
     parser.add_argument("--batch_size", type=int, default=1000)
     parser.add_argument("--debug", action="store_true")
+    parser.add_argument("--device", type=int, default=0)
     args = parser.parse_args()
 
     resume_list = build_resume_list(args.dataset_name, args.data_path, args.debug)
@@ -170,7 +171,7 @@ def main():
         "token-classification",
         model=model,
         tokenizer=tokenizer,
-        device=2,  # 如果没有GPU请改成 -1
+        device=args.device,
     )
 
     for file in resume_list:
