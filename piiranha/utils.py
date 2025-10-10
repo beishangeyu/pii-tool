@@ -3,14 +3,15 @@ import json
 import os
 from typing import Dict, Iterable, List, Tuple
 from itertools import islice
-import scrubadub
 import re
 
 
-def split_inputs_if_long(text: List[str], tokenizer, max_len: int = 256) -> List[str]:
+def split_inputs_if_long(
+    text: List[str], tokenizer, max_len: int = 256, is_debug: bool = False
+) -> List[str]:
     inputs = []
     for s in text:
-        tokens = tokenizer(s, add_special_tokens=False)
+        tokens = tokenizer(s)
         token_count = len(tokens["input_ids"])
         if token_count <= max_len:
             inputs.append(s.strip())
@@ -18,7 +19,8 @@ def split_inputs_if_long(text: List[str], tokenizer, max_len: int = 256) -> List
             sentences = re.split(r"(?<=[。！？.!?])\s*", s.strip())
             sentences = [s for s in sentences if s.strip()]
             inputs.extend(sentences)
-
+            if is_debug:
+                print("splited inputs example:\n", sentences[0])
     return inputs
 
 
@@ -142,24 +144,3 @@ def build_resume_list(
                 resume_list.append((filename, resume_batch_cnt))
 
     return resume_list
-
-
-# TODO 备份, 仅为了看如何检测, 用完记得删掉
-def process_batch(batch_data, batch_num):
-    """处理一批数据"""
-    preds = {
-        "credential": [],
-        "credit_card": [],
-        "email": [],
-        "phone": [],
-        "twitter": [],
-        "url": [],
-        "social_security_number": [],
-    }
-    for data in batch_data:
-        # TAG
-        results = scrubadub.list_filth(data["source_text"])
-        for result in results:
-            if result.type != "unknown":
-                preds[result.type].append(data["source_text"][result.beg : result.end])
-    return preds

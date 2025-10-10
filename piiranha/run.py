@@ -1,7 +1,6 @@
 from __future__ import annotations
 import json, os, argparse
 from typing import List, Dict, Tuple
-from multiprocessing import Pool, cpu_count, set_start_method
 from utils import (
     result_dir,
     result_path_for,
@@ -12,6 +11,7 @@ from utils import (
     split_inputs_if_long,
 )
 from transformers import AutoTokenizer, AutoModelForTokenClassification, pipeline
+from tqdm import tqdm
 
 
 def process_batches_for_file(
@@ -24,6 +24,8 @@ def process_batches_for_file(
     tokenizer,
     pipe,
 ) -> Dict:
+    if debug:
+        batch_size = 1
 
     # TODO 添加新的数据集时这里需要修改
     if dataset_name == "c4" or dataset_name == "dolma":
@@ -50,22 +52,23 @@ def process_batches_for_file(
     for i, batch_items in enumerate(batched(line_iter, batch_size)):
         batch_index = resume_batch_cnt + i + 1
         entity2cnt: Dict[str, int] = {}
-        for item in batch_items:
-            text = item
-            if not text:
-                continue
-            try:
-                # TAG
-                # TODO 再检查一下拆分的逻辑
-                # 拆分超过最长窗口的输入
-                inputs = split_inputs_if_long(text, tokenizer, max_tokens=256)
-                results = pipe(inputs)
-                for sentence_results in results:
-                    for entity_info in sentence_results:
-                        ent = entity_info["entity"]
-                        entity2cnt[ent] = entity2cnt.get(ent, 0) + 1
-            except Exception:
-                continue
+        try:
+            # TAG
+            # TODO 再检查一下拆分的逻辑
+            # 拆分超过最长窗口的输入
+            inputs = split_inputs_if_long(
+                batch_items, tokenizer, max_len=256, is_debug=debug
+            )
+            results = pipe(inputs)
+            for sentence_results in results:
+                for entity_info in sentence_results:
+                    ent = entity_info["entity"]
+                    entity2cnt[ent] = entity2cnt.get(ent, 0) + 1
+        except Exception as e:
+            print(
+                f"Error processing batch {batch_index} in file {filename}, skip it. the reason is: {e}"
+            )
+            continue
         # 写出批次结果
         update_result(
             result_file_path=rpath,
@@ -174,7 +177,9 @@ def main():
         device=args.device,
     )
 
-    for file in resume_list:
+    for file in tqdm(
+        resume_list, desc=f"piiranha processing {args.dataset_name}", disable=args.debug
+    ):
         process_batches_for_file(
             dataset_name=args.dataset_name,
             data_path=args.data_path,
