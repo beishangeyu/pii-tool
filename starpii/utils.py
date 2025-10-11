@@ -6,23 +6,73 @@ from itertools import islice
 import re
 
 
+def split_by_newline(text: str) -> List[str]:
+    # 按一个或多个连续换行符分割，通常用于分离段落
+    paragraphs = re.split(r"\n+", text)
+
+    # 过滤掉空字符串，并进行清理
+    cleaned_paragraphs = []
+    for p in paragraphs:
+        p_strip = p.strip()
+        if p_strip:
+            cleaned_paragraphs.append(p_strip)
+
+    return cleaned_paragraphs
+
+
 def split_inputs_if_long(
     text: List[str], tokenizer, max_len: int = 256, is_debug: bool = False
 ) -> List[str]:
     inputs = []
+
     for s in text:
-        tokens = tokenizer(s)
-        token_count = len(tokens["input_ids"])
+        s_stripped = s.strip()
+        # 1. 检查原始文本（或段落）长度
+        token_count = len(tokenizer(s_stripped)["input_ids"])
+
         if token_count <= max_len:
-            inputs.append(s.strip())
+            inputs.append(s_stripped)
         else:
-            sentences = re.split(r"(?<=[。！？.!?])\s*", s.strip())
-            sentences = [
-                s for s in sentences if len(tokenizer(s)["input_ids"]) <= max_len
-            ]
-            inputs.extend(sentences)
-            if is_debug:
-                print("splited inputs example:\n", sentences[0])
+            # 2. **新增逻辑：尝试按换行符（段落）分割**
+            segments = split_by_newline(s_stripped)
+
+            # 用于收集最终满足长度要求的句子或段落
+            valid_parts = []
+
+            for segment in segments:
+                segment_token_count = len(tokenizer(segment)["input_ids"])
+
+                if segment_token_count <= max_len:
+                    # 段落/行分割后满足长度要求
+                    valid_parts.append(segment)
+                else:
+                    # 3. **如果段落/行仍太长，则按句末标点符号继续分割**
+
+                    # 使用原有的句子分割逻辑
+                    sentences = re.split(r"(?<=[。！？.!?])\s*", segment)
+
+                    # 4. 再次检查分割后的句子是否满足长度
+                    sentences = [
+                        sen.strip()
+                        for sen in sentences
+                        if sen.strip() and len(tokenizer(sen)["input_ids"]) <= max_len
+                    ]
+
+                    valid_parts.extend(sentences)
+
+                    if is_debug and sentences:
+                        print(
+                            "splited inputs example (Sentence Split):\n", sentences[0]
+                        )
+
+            # 5. 将处理后的所有部分加入到最终输出
+            if valid_parts:
+                inputs.extend(valid_parts)
+            elif is_debug and not valid_parts:
+                print(
+                    f"Warning: Segment too long ({token_count} tokens) and could not be broken down into valid parts."
+                )
+
     return inputs
 
 
