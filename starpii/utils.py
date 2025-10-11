@@ -17,7 +17,9 @@ def split_inputs_if_long(
             inputs.append(s.strip())
         else:
             sentences = re.split(r"(?<=[。！？.!?])\s*", s.strip())
-            sentences = [s for s in sentences if s.strip()]
+            sentences = [
+                s for s in sentences if len(tokenizer(s)["input_ids"]) <= max_len
+            ]
             inputs.extend(sentences)
             if is_debug:
                 print("splited inputs example:\n", sentences[0])

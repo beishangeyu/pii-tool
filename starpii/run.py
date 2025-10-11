@@ -66,6 +66,8 @@ def process_batches_for_file(
             print(
                 f"Error processing batch {batch_index} in file {filename}, skip it. the reason is: {e}"
             )
+            if debug:
+                print(f"Inputs:\n", "".join(inputs))
             continue
         # 写出批次结果
         update_result(
