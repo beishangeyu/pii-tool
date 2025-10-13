@@ -5,6 +5,7 @@ from typing import Dict, Iterable, List, Tuple
 from itertools import islice
 import pandas as pd
 
+
 def batched(iterable: Iterable, n: int) -> Iterable[List]:
     """等价于流式 chunks(iterable, n)。"""
     it = iter(iterable)
@@ -36,7 +37,6 @@ def update_result(
             # 有时候出错中断后, 会出现json为空的情况
             except json.JSONDecodeError:
                 result_data = {"batches": {}, "batch_cnt": 0, "completed": False}
-
 
     if completed == True:
         result_data["completed"] = True
@@ -73,7 +73,9 @@ def iter_dataset(file_path: str, datasetname: str) -> Iterable[str]:
                     except Exception:
                         continue
         except Exception as e:
-            print(f"Error reading file: {file_path} in iter_dataset function. Error: {e}")
+            print(
+                f"Error reading file: {file_path} in iter_dataset function. Error: {e}"
+            )
     elif datasetname == "googlenq":
         with gzip.open(file_path, "rt", encoding="utf-8") as f_in:
             for line in f_in:
@@ -125,15 +127,18 @@ def build_resume_list(
 
     return resume_list
 
+
 # 返回csv文件路径
 def strs2csv(str_list: List[str], filename: str, batchcnt: int) -> str:
     csv_file = os.path.join("./tmp_csv", f"{filename}_batch_{batchcnt}.csv")
-    clean_list = [(s if isinstance(s, str) else str(s)).replace('\x00', '') for s in str_list]
+    clean_list = [
+        (s if isinstance(s, str) else str(s)).replace("\x00", "") for s in str_list
+    ]
     df = pd.DataFrame(clean_list)
-    df.to_csv(csv_file, index=False, header=False, escapechar='\\', encoding='utf-8')
+    df.to_csv(csv_file, index=False, header=False, escapechar="\\", encoding="utf-8")
     return csv_file
 
 
 def delete_file(file_path: str, debug: bool) -> None:
-    if os.path.exists(file_path):
+    if os.path.exists(file_path) and not debug:
         os.remove(file_path)
