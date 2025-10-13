@@ -42,7 +42,7 @@ def process_batches_for_file(
 
 
     # TODO 添加新的数据集时这里需要修改
-    if dataset_name == "c4" or dataset_name == "dolma":
+    if dataset_name == "c4" or "dolma" in dataset_name:
         file_path = os.path.join(data_path, filename + ".json.gz")
     elif dataset_name == "googlenq":
         file_path = os.path.join(data_path, filename + ".jsonl.gz")
@@ -201,7 +201,7 @@ def main():
         for summary in tqdm(
             pool.imap_unordered(_run_one, task_args),
             total=total_files,
-            desc=f"Processing {args.dataset_name}",
+            desc=f"Piianalyzer Processing {args.dataset_name}",
         ):
             processed += 1
             # 可选择打印或汇总 summary
