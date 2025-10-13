@@ -63,7 +63,7 @@ def result_path_for(dataset_name: str, filename: str, debug: bool) -> str:
 # TODO 添加新的数据集时这里需要修改
 # 流式读取数据集
 def iter_dataset(file_path: str, datasetname: str) -> Iterable[str]:
-    if datasetname == "c4" or datasetname == "dolma":
+    if datasetname == "c4" or "dolma" in datasetname:
         try:
             with gzip.open(file_path, "rt", encoding="utf-8") as f_in:
                 for line in f_in:

@@ -10,9 +10,10 @@ from utils import (
     iter_dataset,
     batched,
     strs2csv,
-    delete_file
+    delete_file,
 )
 import csv
+
 csv.field_size_limit(10**9)
 
 
@@ -40,7 +41,6 @@ def process_batches_for_file(
     """子进程执行体：顺序处理一个文件的所有 batch, 并按批次落盘。"""
     from piianalyzer.analyzer import PiiAnalyzer
 
-
     # TODO 添加新的数据集时这里需要修改
     if dataset_name == "c4" or "dolma" in dataset_name:
         file_path = os.path.join(data_path, filename + ".json.gz")
@@ -66,10 +66,12 @@ def process_batches_for_file(
     for i, batch_items in enumerate(batched(line_iter, batch_size)):
         batch_index = resume_batch_cnt + i + 1
         entity2cnt: Dict[str, int] = {}
-        csv_file_path = strs2csv(str_list=batch_items, filename=filename, batchcnt=batch_index)
+        csv_file_path = strs2csv(
+            str_list=batch_items, filename=filename, batchcnt=batch_index
+        )
         piianalyzer = PiiAnalyzer(csv_file_path)
         # key是种类, value是找到了哪些单词
-        analysis:Dict[str, List[str]] = piianalyzer.analysis()
+        analysis: Dict[str, List[str]] = piianalyzer.analysis()
         for entity_type, entities in analysis.items():
             entity2cnt[entity_type] = entity2cnt.get(entity_type, 0) + len(entities)
         # 写出批次结果
@@ -86,7 +88,6 @@ def process_batches_for_file(
                 f"[DEBUG] {filename}: processed batch {batch_index}, entities={entity2cnt}"
             )
             break  # debug 下只处理 1 个 batch
-        
 
     # 标记文件完成（若 debug 则不标完成）
     if not debug:
@@ -165,7 +166,6 @@ def main():
 
     resume_list = build_resume_list(args.dataset_name, args.data_path, args.debug)
     ensure_dir("./tmp_csv")  # 确保临时csv目录存在
-    
 
     if args.debug:
         # debug：只跑前 1 个文件
@@ -208,7 +208,6 @@ def main():
             if args.debug:
                 print("[DEBUG] summary:", summary)
 
-    delete_file("./tmp_csv", args.debug)
     print(f"Done. Files processed: {processed}/{total_files}.")
 
 
